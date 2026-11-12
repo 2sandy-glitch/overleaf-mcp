@@ -1,12 +1,13 @@
 """overleaf-web backend against the fake Overleaf: pull, push, conflicts, folders, compile, auth."""
 
 import json
+import subprocess
 
 import pytest
 from fake_overleaf import COOKIE, PROJECT_ID, FakeOverleaf
 
 from agent import registry
-from agent.errors import AuthError
+from agent.errors import AuthError, WorkspaceError
 from integrations.overleaf import socketio, web_client
 
 RESUME = b"""\\documentclass{article}
@@ -134,3 +135,25 @@ def test_cookie_and_packet_parsing():
         "img": {"id": "f", "type": "folder"},
         "img/a.png": {"id": "x", "type": "file"},
     }
+
+
+def test_git_bridge_project_compiles_on_overleaf_with_cookie(fake, tmp_path, monkeypatch):
+    hosts = tmp_path / "githost"
+    seed = tmp_path / "seed"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "master", str(hosts / PROJECT_ID)], check=True)
+    subprocess.run(["git", "clone", "-q", str(hosts / PROJECT_ID), str(seed)], check=True, capture_output=True)
+    (seed / "main.tex").write_bytes(RESUME)
+    for args in (["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"], ["push", "-q", "origin", "master"]):
+        subprocess.run(["git", *args], cwd=seed, check=True, capture_output=True)
+
+    cfg = tmp_path / "projects.json"
+    project = {"backend": "overleaf-git", "project_id": PROJECT_ID, "token": "t0k", "git_host": str(hosts)}
+    cfg.write_text(json.dumps({"default": "g", "overleaf_cookie": f"overleaf_session2={COOKIE}", "projects": {"g": project}}))
+    registry.reset()
+    ws = registry.workspace(None)
+    out = ws.compile(where="overleaf")
+    assert out["ok"] and out["pdf"] and out["note"] == ""
+
+    cfg.write_text(json.dumps({"default": "g", "projects": {"g": project}}))  # no cookie -> clear refusal
+    with pytest.raises(WorkspaceError, match="session cookie"):
+        registry.workspace(None).compile(where="overleaf")

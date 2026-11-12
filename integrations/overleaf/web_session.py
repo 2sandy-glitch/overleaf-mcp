@@ -21,8 +21,8 @@ from pathlib import Path, PurePosixPath
 from agent.errors import BackendError
 from integrations.backend import SyncResult
 from integrations.git.client import GitBackend
+from integrations.overleaf.remote_compile import compile_on_overleaf, unpushed_note
 from integrations.overleaf.web_client import OverleafWebClient
-from latex.compile import parse_log
 
 MIRROR_BRANCH = "main"
 
@@ -155,44 +155,14 @@ class WebSessionBackend(GitBackend):
 
     # ---- remote compile -------------------------------------------------
 
+    can_remote_compile = True
+
     def remote_compile(self, main_file: str | None, out_dir: Path) -> dict:
         """Compile on Overleaf (what is on Overleaf now, not unpushed edits) and download the PDF + log."""
         self.ensure_ready()
-        root_path = main_file or self.main_file
         client = self._client_factory()
         try:
-            tree, project = client.tree(self.project_id)
-            entity = tree.get(root_path)
-            if entity is None or entity["type"] != "doc":
-                root_id = project.get("rootDoc_id")
-                root_path = next((p for p, e in tree.items() if e["id"] == root_id), root_path)
-                if not root_id:
-                    raise BackendError(f"'{root_path}' is not a document on Overleaf.")
-            else:
-                root_id = entity["id"]
-            result = client.compile(self.project_id, root_id, root_path)
-            status = result.get("status", "unknown")
-            outputs = {f.get("path"): f for f in result.get("outputFiles") or []}
-            out_dir.mkdir(parents=True, exist_ok=True)
-            saved = {}
-            for name in ("output.pdf", "output.log"):
-                if name in outputs and outputs[name].get("url"):
-                    data = client.fetch_output(outputs[name]["url"], result.get("clsiServerId"))
-                    (out_dir / name).write_bytes(data)
-                    saved[name] = str(out_dir / name)
+            result = compile_on_overleaf(client, self.project_id, main_file or self.main_file, out_dir)
         finally:
             client.close()
-
-        log = (out_dir / "output.log").read_text(errors="replace") if "output.log" in saved else ""
-        unpushed = self.status()
-        pending = len(unpushed["uncommitted_changes"]) + unpushed["unpushed_commits"]
-        return {
-            "ok": status == "success",
-            "compiler": "overleaf",
-            "status": status,
-            "pdf": saved.get("output.pdf"),
-            "log": saved.get("output.log"),
-            "message": "Compiled on Overleaf." if status == "success" else f"Overleaf compile status: {status}.",
-            "note": "Overleaf compiled its own copy; unpushed local edits are not included." if pending else "",
-            **parse_log(log),
-        }
+        return {**result, "note": unpushed_note(self.status())}

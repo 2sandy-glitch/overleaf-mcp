@@ -33,6 +33,8 @@ class SyncResult:
 
 class Backend(ABC):
     kind: str = "abstract"
+    # Integrations that can build the PDF on Overleaf's servers set this and implement remote_compile.
+    can_remote_compile: bool = False
 
     def __init__(self, workdir: Path):
         self.workdir = workdir
@@ -60,3 +62,7 @@ class Backend(ABC):
     @abstractmethod
     def discard(self, paths: list[str] | None = None) -> SyncResult:
         """Throw away local edits (all, or only the given paths)."""
+
+    def remote_compile(self, main_file: str | None, out_dir: Path) -> dict:
+        """Build on the remote service and download the output (only where can_remote_compile)."""
+        raise NotImplementedError

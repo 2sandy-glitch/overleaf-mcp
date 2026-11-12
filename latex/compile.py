@@ -22,6 +22,21 @@ def available_compiler() -> str | None:
     return None
 
 
+_PAGES_IN_LOG = re.compile(r"Output written on .*?\((\d+) pages?")
+_PAGE_OBJ = re.compile(rb"/Type\s*/Page(?!s)")
+
+
+def page_count(log: str = "", pdf: Path | None = None) -> int | None:
+    """Pages in the output: from the TeX log line, else by counting page objects in the PDF."""
+    m = _PAGES_IN_LOG.search(log or "")
+    if m:
+        return int(m.group(1))
+    if pdf and pdf.exists():
+        n = len(_PAGE_OBJ.findall(pdf.read_bytes()))
+        return n or None
+    return None
+
+
 def parse_log(log: str) -> dict:
     errors, warnings = [], []
     lines = log.splitlines()
@@ -82,6 +97,7 @@ def compile_project(workdir: Path, main_file: str, build_dir: Path, engine: str 
         "ok": ok,
         "compiler": tool,
         "pdf": str(pdf) if pdf.exists() else None,
+        "pages": page_count(log, pdf),
         "message": "Compiled cleanly." if ok else "Compile failed.",
         **parsed,
     }

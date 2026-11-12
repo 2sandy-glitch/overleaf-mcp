@@ -26,7 +26,8 @@ def build_backend(pc) -> Backend:
         )
     if pc.backend == "overleaf-git":
         workdir = data_dir() / "workspaces" / pc.key
-        return overleaf_git_backend(workdir, pc.project_id, pc.token, pc.git_host, pc.branch)
+        factory = (lambda: OverleafWebClient(pc.web_url, pc.cookie)) if pc.cookie else None
+        return overleaf_git_backend(workdir, pc.project_id, pc.token, pc.git_host, pc.branch, factory, pc.main_file)
     if pc.backend == "git":
         workdir = data_dir() / "workspaces" / pc.key
         return GitBackend(workdir, remote_url=pc.remote_url, token=pc.token, branch=pc.branch)

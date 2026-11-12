@@ -1,4 +1,4 @@
-"""Sections across \\input / \\include files."""
+"""Sections across \\input / \\include files, and PDF page counts."""
 
 import json
 
@@ -6,6 +6,7 @@ import pytest
 
 from agent import registry
 from agent.errors import WorkspaceError
+from latex.compile import page_count
 from latex.includes import find_includes, include_tree
 
 MAIN = r"""\documentclass{article}
@@ -78,3 +79,11 @@ def test_include_resolution_rules():
     files = {"main.tex": "\\input{a}\\input{main}", "a.tex": "\\input{a}"}
     assert include_tree("main.tex", files.get) == ["main.tex", "a.tex"]  # cycles cut
 
+
+def test_page_count(tmp_path):
+    assert page_count("Output written on output.pdf (2 pages, 51234 bytes).") == 2
+    assert page_count("Output written on output.pdf (1 page, 51234 bytes).") == 1
+    pdf = tmp_path / "x.pdf"
+    pdf.write_bytes(b"<< /Type /Pages /Count 3 >> << /Type /Page >> << /Type/Page >> << /Type /Page >>")
+    assert page_count("", pdf) == 3
+    assert page_count("") is None

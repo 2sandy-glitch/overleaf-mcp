@@ -218,12 +218,15 @@ class Workspace:
         self.ready()
         main = main_file or self.config.main_file
         self.resolve(main)
-        can_remote = hasattr(self.backend, "remote_compile")
+        can_remote = self.backend.can_remote_compile
         if where == "auto":
             where = "local" if available_compiler() or not can_remote else "overleaf"
         if where == "overleaf":
             if not can_remote:
-                raise WorkspaceError("Compiling on Overleaf needs the overleaf-web backend for this project.")
+                raise WorkspaceError(
+                    "Compiling on Overleaf needs an overleaf-web project, or an overleaf-git project with a "
+                    "session cookie (run ./entry.sh login)."
+                )
             return self.backend.remote_compile(main, data_dir() / "builds" / self.config.key / "overleaf")
         if where != "local":
             raise WorkspaceError("where must be auto, local or overleaf.")
