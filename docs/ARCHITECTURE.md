@@ -1,4 +1,4 @@
-# Architecture (v0.0.2)
+# Architecture (v0.2.0)
 
 The folder layout follows the ACI agentic-system: flat top-level folders by role, `app.py` + `entry.sh` at the root, `config.json` for settings, one folder per integration.
 
@@ -21,13 +21,16 @@ overleaf-MCP/
 │   ├── backend.py            Backend contract: ensure_ready, pull, push, status, diff, discard
 │   ├── git/client.py         any git remote, or a local folder with no remote
 │   └── overleaf/
-│       ├── git_bridge.py     Overleaf's official Git bridge (paid plans)
+│       ├── git_bridge.py     Overleaf's official Git bridge (paid plans), compiles on Overleaf when a cookie is set
 │       ├── web_client.py     Overleaf web endpoints via session cookie (free plans)
 │       ├── socketio.py       read-only joinProject handshake → file/folder ids
-│       └── web_session.py    overleaf-web backend: zip mirror + upload/delete of changed files
+│       ├── web_session.py    overleaf-web backend: zip mirror + upload/delete of changed files
+│       ├── remote_compile.py compile on Overleaf, download PDF + log (shared by both Overleaf backends)
+│       └── browser_login.py  sign in through a real browser window, capture the session over DevTools
 ├── latex/
-│   ├── sections.py           section parsing / replacement (heading commands configurable)
-│   └── compile.py            local latexmk/tectonic compile + log parsing
+│   ├── sections.py           section parsing / replacement (heading commands and levels configurable)
+│   ├── includes.py           \input/\include/\subfile/\import tree, sections across files
+│   └── compile.py            local latexmk/tectonic compile, log parsing, page count
 ├── tools/                  MCP tools, one file per area
 │   ├── registry.py           registers every module's TOOLS with its annotation
 │   ├── project_tools.py      list_projects, list_overleaf_projects, pull, status, diff, push, discard_changes
@@ -39,8 +42,8 @@ overleaf-MCP/
 │   └── edit_document.md
 ├── scripts/
 │   ├── checks/               check.sh: syntax | imports | secrets | all
-│   ├── tools/login.py        ./entry.sh login: save cookie, add a project
-│   └── testsuite/            s_flow.py (git backends), s_web_session.py + fake_overleaf.py
+│   ├── tools/login.py        ./entry.sh login [--paste]: browser sign-in, add a project
+│   └── testsuite/            s_flow.py (git), s_web_session.py + fake_overleaf.py, s_multifile.py, s_browser_login.py
 └── docs/
 ```
 
@@ -89,9 +92,14 @@ On push, the backend takes a fresh snapshot, rebases, then works out `git diff -
 | A setting | Key in `config.json`, read with `get_config("<section>")` |
 | A rule check | `scripts/checks/check_<name>.py` + a line in `check.sh` |
 
+## Multi-file sections (v0.2.0)
+
+Section tools start from the main file and walk its include tree in document order (`latex/includes.py`). `\input`, `\include` and `\import` resolve from the main file's folder, where TeX runs. `\subfile` and `\subimport` resolve from the file that contains them. Commented-out includes, missing files, cycles and very deep nesting are skipped.
+
+Each section belongs to one file. A section ends at the next heading of the same or higher level, and also just before an include line whose file opens a section of that level. That way, replacing "Summary" in `main.tex` keeps the `\input` that brings in "Experience". An include that only adds body text stays inside its section.
+
 ## Roadmap ideas
 
-- Browser-driven login (open a window, capture the cookie) instead of pasting it.
-- Remote compile for `overleaf-git` projects when a cookie is also set.
-- Multi-file flattening across `\input` / `\include`.
+- PDF page images in compile results, so the layout can be checked visually.
+- `\include`-aware search and a flattened read of the whole document.
 - Tracked-changes edits through Overleaf's realtime API.

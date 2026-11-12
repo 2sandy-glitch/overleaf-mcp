@@ -5,7 +5,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-VERSION = "0.0.2"
+VERSION = "0.2.0"
 ROOT = Path(__file__).resolve().parent.parent
 
 

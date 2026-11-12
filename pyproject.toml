@@ -1,6 +1,6 @@
 [project]
 name = "overleaf-mcp"
-version = "0.0.2"
+version = "0.2.0"
 description = "Generic MCP server for editing Overleaf LaTeX projects from Claude Code"
 readme = "README.md"
 authors = [

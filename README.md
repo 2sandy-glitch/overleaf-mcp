@@ -1,4 +1,4 @@
-# overleaf-mcp v0.0.2
+# overleaf-mcp v0.2.0
 
 A generic MCP server that connects Claude Code to Overleaf. You describe the change in plain language and Claude reads the LaTeX, edits it, shows you the diff, and saves it back to Overleaf.
 
@@ -8,8 +8,8 @@ First use case: tailoring a resume to a job description. The core doesn't know a
 
 | Backend | Overleaf plan | How it signs in | Notes |
 | --- | --- | --- | --- |
-| `overleaf-web` (new in 0.0.2) | **Free** or paid | Your browser session cookie | Uses the same endpoints as the Overleaf web editor. These aren't a public API: they can change without notice, and automating them may go against Overleaf's terms. Keep usage personal and light. The session lasts about 5 days from last use. |
-| `overleaf-git` | Paid (Git integration) | Git token | Official and stable. |
+| `overleaf-web` | **Free** or paid | Browser sign-in (`./entry.sh login`) | Uses the same endpoints as the Overleaf web editor. These aren't a public API: they can change without notice, and automating them may go against Overleaf's terms. Keep usage personal and light. The session lasts about 5 days from last use. |
+| `overleaf-git` | Paid (Git integration) | Git token | Official and stable. Run `login` too if you want to compile on Overleaf. |
 | `git` / `local` | n/a | Optional token | Any git host, or a plain folder. |
 
 Whichever backend you use, edits stay on your machine until you approve a `push`, and a push never overwrites a co-author's change to the same lines.
@@ -19,17 +19,13 @@ Whichever backend you use, edits stay on your machine until you approve a `push`
 ```bash
 cd ~/overleaf-MCP
 ./entry.sh setup      # installs deps, creates ~/.config/overleaf-mcp/projects.json (mode 600)
-./entry.sh login      # paste your Overleaf session cookie, pick your resume project
+./entry.sh login      # opens a browser: sign in to Overleaf, pick your resume project
 ./entry.sh register   # adds the server to Claude Code (user scope)
 ```
 
-**Getting the cookie for `login`.** Overleaf's sign-in page has a captcha, so the tool never asks for your password:
+`login` opens Chrome, Chromium, Edge or Brave in a separate profile on the Overleaf sign-in page. Sign in the way you normally do (password, Google, SSO). The window closes by itself once you're in. Your password never passes through this tool. `login` then lists your projects, adds the one you pick, and saves the session to `projects.json` (mode 600). When the session expires (about 5 days after last use), tools say so; run `./entry.sh login` again, which is usually one click.
 
-1. Sign in at overleaf.com in your browser.
-2. Open DevTools (F12) → **Application** (Chrome) or **Storage** (Firefox) → **Cookies** → `https://www.overleaf.com`.
-3. Copy the **Value** of `overleaf_session2` and paste it at the hidden prompt.
-
-`login` checks the cookie, lists your projects, adds the one you pick, and saves everything to `projects.json` (mode 600). When the session expires, tools say so; run `./entry.sh login` again.
+No browser, or working over SSH? Run `./entry.sh login --paste` and paste the `overleaf_session2` cookie. To find it, sign in at overleaf.com, open DevTools (F12) → **Application** / **Storage** → **Cookies** → `https://www.overleaf.com`, and copy the cookie's **Value**.
 
 Restart Claude Code and check `/mcp`. `overleaf` should be listed as connected. `./entry.sh status` shows the version, the projects file, and the registration.
 
@@ -56,10 +52,11 @@ The usual flow: `pull` → `outline` / `read_section` → `replace_section` / `e
 | `list_projects`, `status`, `diff` | Read only |
 | `list_overleaf_projects` | Read only: projects in your Overleaf account (needs `login`) |
 | `pull` | Fetch the latest from Overleaf, keeping local edits |
-| `list_files`, `read_file`, `search`, `outline`, `read_section` | Read only |
-| `write_file`, `edit_file`, `replace_section`, `move_file`, `import_file` | Change the local copy only |
+| `list_files`, `read_file`, `search` | Read only |
+| `outline`, `read_section` | Read only. Follow `\input` / `\include` / `\subfile` / `\import` from the main file, so templates with one file per section work. |
+| `write_file`, `edit_file`, `replace_section`, `move_file`, `import_file` | Change the local copy only (`replace_section` edits whichever file holds the section) |
 | `delete_file`, `discard_changes` | Destructive, local copy only |
-| `compile` | `where=overleaf`: Overleaf builds what is pushed, and the PDF and log are downloaded. `where=local`: latexmk/tectonic on this machine, including unpushed edits. `auto` uses local if TeX is installed. |
+| `compile` | `where=overleaf`: Overleaf builds what is pushed, and the PDF and log are downloaded. `where=local`: latexmk/tectonic on this machine, including unpushed edits. `auto` uses local if TeX is installed. Both report errors, warnings and the number of `pages`. |
 | `push` | Publish to Overleaf. Refuses if a co-author changed the same lines |
 
 Working copies live in `~/.local/share/overleaf-mcp/workspaces/<project>/`, and compile output in `~/.local/share/overleaf-mcp/builds/<project>/`.
