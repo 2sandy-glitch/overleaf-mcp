@@ -4,7 +4,7 @@
 # =============================================================================
 # Usage:
 #   ./entry.sh setup        - Install dependencies (uv sync) and create the projects.json skeleton
-#   ./entry.sh login        - Save the Overleaf session cookie (free plans) and pick a project
+#   ./entry.sh login        - Sign in to Overleaf in a browser window (--paste: paste the cookie) and pick a project
 #   ./entry.sh start        - Run the MCP server on stdio (what Claude Code launches)
 #   ./entry.sh register     - Add/refresh the server in Claude Code (user scope)
 #   ./entry.sh unregister   - Remove it from Claude Code
@@ -67,7 +67,7 @@ do_status() {
 
 case "$1" in
     setup)      do_setup ;;
-    login)      uv run -q python -m scripts.tools.login ;;
+    login)      shift; uv run -q python -m scripts.tools.login "$@" ;;
     start)      exec uv run -q python app.py ;;
     register)   do_register ;;
     unregister) need claude; claude mcp remove "$SERVER_NAME" --scope user ;;

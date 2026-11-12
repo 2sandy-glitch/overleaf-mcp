@@ -62,5 +62,17 @@
   },
   "web": {
     "timeout_seconds": 60
+  },
+  "login": {
+    "browsers": [
+      "google-chrome",
+      "google-chrome-stable",
+      "chromium",
+      "chromium-browser",
+      "microsoft-edge",
+      "brave-browser"
+    ],
+    "timeout_seconds": 300,
+    "poll_seconds": 2
   }
 }
