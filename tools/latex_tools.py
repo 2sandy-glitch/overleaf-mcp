@@ -4,19 +4,21 @@ from agent.registry import run
 
 
 def outline(project: str | None = None, path: str | None = None) -> list[dict]:
-    """List the section headings of a .tex file (default: the main file)
-    with level and line span."""
+    """List section headings with file, level and line span. Default: the main
+    file and every file it pulls in with \\input / \\include / \\subfile / \\import,
+    in document order. Give `path` to look at one file only."""
     return run(project, lambda ws: ws.outline(path))
 
 
 def read_section(title: str, project: str | None = None, path: str | None = None) -> dict:
-    """Read one section, heading line included, by its title."""
+    """Read one section, heading line included, by its title. Searches the main
+    file and its included files unless `path` is given."""
     return run(project, lambda ws: ws.read_section(path, title))
 
 
 def replace_section(title: str, content: str, project: str | None = None, path: str | None = None) -> dict:
-    """Replace one whole section (heading line included) with `content`.
-    Include the heading command in `content` if you want to keep it."""
+    """Replace one whole section (heading line included) with `content`, in
+    whichever file holds it. Include the heading command in `content` to keep it."""
     return run(project, lambda ws: ws.replace_section(path, title, content))
 
 

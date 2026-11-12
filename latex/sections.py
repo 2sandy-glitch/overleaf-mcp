@@ -18,9 +18,11 @@ class Section:
     title: str
     start_line: int  # 1-based, the heading line
     end_line: int  # 1-based, inclusive
+    path: str = ""  # file the section lives in (multi-file projects)
 
     def as_dict(self) -> dict:
         return {
+            "path": self.path,
             "command": self.command,
             "level": self.level,
             "title": self.title,
@@ -29,8 +31,18 @@ class Section:
         }
 
 
-def _heading_regex(commands: list[str]) -> re.Pattern:
-    names = "|".join(re.escape(c) for c in commands)
+def levels(commands: list) -> dict[str, int]:
+    """Heading command -> level. Each entry is one level: a name, or a list of names
+    that rank the same (e.g. ["section", "cvsection"])."""
+    out: dict[str, int] = {}
+    for i, item in enumerate(commands):
+        for name in [item] if isinstance(item, str) else item:
+            out[name] = i
+    return out
+
+
+def _heading_regex(commands: list) -> re.Pattern:
+    names = "|".join(re.escape(c) for c in sorted(levels(commands), key=len, reverse=True))
     # \section*[short]{Title}  — title may contain one level of nested braces.
     return re.compile(r"^[ \t]*\\(" + names + r")\*?(?:\[[^\]]*\])?\{((?:[^{}]|\{[^{}]*\})*)\}")
 
@@ -39,9 +51,9 @@ def _strip_comment(line: str) -> str:
     return re.sub(r"(?<!\\)%.*", "", line)
 
 
-def parse_sections(text: str, commands: list[str]) -> list[Section]:
+def parse_sections(text: str, commands: list, path: str = "") -> list[Section]:
     pattern = _heading_regex(commands)
-    level_of = {c: i for i, c in enumerate(commands)}
+    level_of = levels(commands)
     lines = text.splitlines()
 
     # Sections never run past \end{document}.
@@ -68,7 +80,7 @@ def parse_sections(text: str, commands: list[str]) -> list[Section]:
         # Trim trailing blank lines from the section span.
         while end - 1 > line_no and not lines[end - 1].strip():
             end -= 1
-        sections.append(Section(cmd, level, title, line_no + 1, end))
+        sections.append(Section(cmd, level, title, line_no + 1, end, path))
     return sections
 
 
@@ -80,8 +92,8 @@ def find_section(sections: list[Section], title: str) -> Section:
     if len(loose) == 1:
         return loose[0]
     if len(exact) > 1 or len(loose) > 1:
-        lines = ", ".join(str(s.start_line) for s in (exact or loose))
-        raise ValueError(f"Several sections are titled '{title}' (lines {lines}); edit by text instead.")
+        where = ", ".join(f"{s.path}:{s.start_line}" if s.path else str(s.start_line) for s in (exact or loose))
+        raise ValueError(f"Several sections are titled '{title}' ({where}); pass path, or edit by text instead.")
     known = "; ".join(s.title for s in sections) or "none found"
     raise ValueError(f"No section titled '{title}'. Sections: {known}")
 

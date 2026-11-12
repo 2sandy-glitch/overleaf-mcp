@@ -38,12 +38,26 @@
   },
   "latex": {
     "section_commands": [
-      "part",
-      "chapter",
-      "section",
-      "subsection",
-      "subsubsection",
-      "paragraph"
+      [
+        "part"
+      ],
+      [
+        "chapter"
+      ],
+      [
+        "section",
+        "cvsection"
+      ],
+      [
+        "subsection",
+        "cvsubsection"
+      ],
+      [
+        "subsubsection"
+      ],
+      [
+        "paragraph"
+      ]
     ]
   },
   "web": {

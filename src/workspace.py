@@ -15,6 +15,7 @@ from agent.errors import WorkspaceError
 from integrations import Backend, build_backend
 from latex import sections as sec
 from latex.compile import available_compiler, compile_project
+from latex.includes import document_sections, include_tree
 from src import data_dir, get_config
 from src.projects import ProjectConfig
 
@@ -160,29 +161,55 @@ class Workspace:
 
     # ---- sections -------------------------------------------------------
 
+    def _maybe_text(self, rel: str) -> str | None:
+        """Text of a .tex file in the project, or None if it is missing / not usable."""
+        try:
+            path = self.resolve(rel)
+        except WorkspaceError:
+            return None
+        if not path.is_file() or path.suffix != ".tex":
+            return None
+        try:
+            return self.read(rel)
+        except WorkspaceError:
+            return None
+
+    def document_files(self, rel: str | None = None) -> list[str]:
+        """The given file (or the main file) plus everything it \\input/\\include-s, in order."""
+        self.ready()
+        root = rel or self.config.main_file
+        if rel:
+            self.resolve(rel)
+        files = include_tree(root, self._maybe_text)
+        if not files:
+            raise WorkspaceError(f"'{root}' not found or not a .tex file. Set main_file for this project or pass path.")
+        return files
+
+    def _all_sections(self, rel: str | None) -> list:
+        root = rel or self.config.main_file
+        self.document_files(rel)  # validates root
+        found = document_sections(root, self._maybe_text, self.config.section_commands)
+        # With an explicit path, only that file's own sections (still trimmed at its includes).
+        return [s for s in found if s.path == rel] if rel else found
+
+    def _find(self, rel: str | None, title: str):
+        try:
+            return sec.find_section(self._all_sections(rel), title)
+        except ValueError as exc:
+            raise WorkspaceError(str(exc)) from exc
+
     def outline(self, rel: str | None = None) -> list[dict]:
-        rel = rel or self.config.main_file
-        text = self.read(rel)
-        return [s.as_dict() for s in sec.parse_sections(text, self.config.section_commands)]
+        return [s.as_dict() for s in self._all_sections(rel)]
 
     def read_section(self, rel: str | None, title: str) -> dict:
-        rel = rel or self.config.main_file
-        text = self.read(rel)
-        try:
-            s = sec.find_section(sec.parse_sections(text, self.config.section_commands), title)
-        except ValueError as exc:
-            raise WorkspaceError(str(exc)) from exc
-        return {**s.as_dict(), "path": rel, "content": sec.section_text(text, s)}
+        s = self._find(rel, title)
+        return {**s.as_dict(), "content": sec.section_text(self.read(s.path), s)}
 
     def replace_section(self, rel: str | None, title: str, content: str) -> dict:
-        rel = rel or self.config.main_file
-        text = self.read(rel)
-        try:
-            s = sec.find_section(sec.parse_sections(text, self.config.section_commands), title)
-        except ValueError as exc:
-            raise WorkspaceError(str(exc)) from exc
-        self.resolve(rel).write_text(sec.replace_section(text, s, content))
-        return {"path": rel, "replaced": s.title, "old_lines": [s.start_line, s.end_line]}
+        s = self._find(rel, title)
+        text = self.read(s.path)
+        self.resolve(s.path).write_text(sec.replace_section(text, s, content))
+        return {"path": s.path, "replaced": s.title, "old_lines": [s.start_line, s.end_line]}
 
     # ---- compile --------------------------------------------------------
 

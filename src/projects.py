@@ -28,7 +28,7 @@ class ProjectConfig:
     remote_url: str = ""
     branch: str = ""
     path: str = ""
-    section_commands: list[str] = field(default_factory=list)
+    section_commands: list = field(default_factory=list)
 
     def public(self) -> dict:
         """Safe-to-show view: never includes the token."""
