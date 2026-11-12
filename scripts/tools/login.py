@@ -1,12 +1,24 @@
 """Sign in to Overleaf and save the session; optionally add a project.
 
-    ./entry.sh login           opens a browser window: sign in as usual, it closes by itself
-    ./entry.sh login --paste   paste the overleaf_session2 cookie by hand instead
+    ./entry.sh login             opens a browser window: sign in as usual, it closes by itself
+    ./entry.sh login --paste     paste the session cookie from your own browser instead
+    ./entry.sh login --browser   force the browser window even over SSH
 
-Manual cookie: sign in at overleaf.com, then DevTools (F12) -> Application/Storage
--> Cookies -> https://www.overleaf.com -> copy the Value of `overleaf_session2`.
+Over SSH (e.g. VS Code Remote-SSH) a window would open on the remote machine's
+screen, which you cannot see, so --paste is used automatically.
 
 The session is written to projects.json (mode 600) and never shown again.
+"""
+
+PASTE_STEPS = """
+Copy your Overleaf session from the browser on YOUR computer (Edge or Chrome):
+  1. Open https://www.overleaf.com and sign in.
+  2. Press F12 -> open the "Application" tab (Firefox: "Storage").
+  3. Left side: Cookies -> https://www.overleaf.com
+  4. Click the row named  overleaf_session2  and copy its Value
+     (double-click the Value cell, Ctrl+C). It starts with s%3A
+  5. Paste it below (right-click or Ctrl+Shift+V in the VS Code terminal).
+     Nothing shows while you paste; that is normal. Press Enter.
 """
 
 import argparse
@@ -52,25 +64,33 @@ def signed_in(web_url: str, cookie: str) -> bool:
         client.close()
 
 
-def get_cookie(web_url: str, paste: bool) -> str:
+def over_ssh() -> bool:
+    return bool(os.environ.get("SSH_CONNECTION") or os.environ.get("SSH_CLIENT") or os.environ.get("SSH_TTY"))
+
+
+def get_cookie(web_url: str, paste: bool, force_browser: bool) -> str:
+    if not paste and not force_browser and over_ssh():
+        print("You are connected over SSH, so a browser window here would open on the remote screen.")
+        paste = True
     if not paste and find_browser():
         print("Opening a browser window. Sign in to Overleaf there; it closes by itself when done.")
         print("(Waiting up to 5 minutes. Ctrl+C to cancel.)")
         return capture_session(web_url, lambda c: signed_in(web_url, c))
     if not paste:
         print("No Chrome/Chromium/Edge/Brave found, so paste the cookie instead.")
-    print(__doc__.split("\n\n")[2])
-    return getpass.getpass("overleaf_session2 value (input hidden): ").strip()
+    print(PASTE_STEPS)
+    return getpass.getpass("overleaf_session2 value (hidden): ").strip()
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Sign in to Overleaf for overleaf-mcp.")
-    ap.add_argument("--paste", action="store_true", help="paste the cookie by hand instead of opening a browser")
+    ap.add_argument("--paste", action="store_true", help="paste the cookie from your own browser instead of opening one")
+    ap.add_argument("--browser", action="store_true", help="open the browser window even over SSH")
     args = ap.parse_args()
 
     web_url = get_config("overleaf")["web_url"]
     try:
-        cookie = get_cookie(web_url, args.paste)
+        cookie = get_cookie(web_url, args.paste, args.browser)
         if not cookie:
             print("Nothing entered; no change made.")
             return 1

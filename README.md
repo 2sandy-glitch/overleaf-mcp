@@ -25,7 +25,7 @@ cd ~/overleaf-MCP
 
 `login` opens Chrome, Chromium, Edge or Brave in a separate profile on the Overleaf sign-in page. Sign in the way you normally do (password, Google, SSO). The window closes by itself once you're in. Your password never passes through this tool. `login` then lists your projects, adds the one you pick, and saves the session to `projects.json` (mode 600). When the session expires (about 5 days after last use), tools say so; run `./entry.sh login` again, which is usually one click.
 
-No browser, or working over SSH? Run `./entry.sh login --paste` and paste the `overleaf_session2` cookie. To find it, sign in at overleaf.com, open DevTools (F12) → **Application** / **Storage** → **Cookies** → `https://www.overleaf.com`, and copy the cookie's **Value**.
+**Using VS Code Remote-SSH, or any SSH session?** A browser window would open on the remote machine's screen, so `login` switches to paste mode automatically and prints these steps. Sign in to Overleaf in the browser on **your own computer**, press F12, go to **Application** (Firefox: **Storage**) → **Cookies** → `https://www.overleaf.com`, and copy the **Value** of `overleaf_session2` (it starts with `s%3A`). Paste it into the VS Code terminal and press Enter; nothing shows while you paste. You can force either mode with `--paste` or `--browser`.
 
 Restart Claude Code and check `/mcp`. `overleaf` should be listed as connected. `./entry.sh status` shows the version, the projects file, and the registration.
 
