@@ -26,6 +26,45 @@ from src import data_dir, get_config
 SESSION_COOKIE = "overleaf_session2"
 
 
+def display_env(environ: dict | None = None, runtime_dir: str | None = None, x11_dir: str = "/tmp/.X11-unix") -> tuple[dict, list[str]]:
+    """(environment, extra browser flags) that let the browser open on the user's desktop.
+
+    Terminals such as VS Code's sometimes start without DISPLAY / WAYLAND_DISPLAY even
+    though a desktop session is running. Then we look for the session ourselves:
+    the user's Wayland socket first, else an X display the user owns.
+    """
+    env = dict(os.environ if environ is None else environ)
+    if env.get("DISPLAY") or env.get("WAYLAND_DISPLAY"):
+        return env, []
+    runtime = Path(runtime_dir or env.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
+    sockets = sorted(p for p in runtime.glob("wayland-[0-9]*") if not p.name.endswith(".lock")) if runtime.is_dir() else []
+    if sockets:
+        env["XDG_RUNTIME_DIR"] = str(runtime)
+        env["WAYLAND_DISPLAY"] = sockets[0].name
+        return env, ["--ozone-platform=wayland"]
+    x11 = Path(x11_dir)
+    mine = sorted(p for p in x11.glob("X[0-9]*") if p.stat().st_uid == os.getuid()) if x11.is_dir() else []
+    if mine:
+        env["DISPLAY"] = ":" + mine[0].name[1:]
+        auths = sorted(runtime.glob(".mutter-Xwaylandauth.*"), key=lambda p: p.stat().st_mtime) if runtime.is_dir() else []
+        if auths and not env.get("XAUTHORITY"):
+            env["XAUTHORITY"] = str(auths[-1])
+        return env, ["--ozone-platform=x11"]
+    raise AuthError(
+        "No desktop display found (are you on SSH or a server?). Run ./entry.sh login --paste to paste the cookie instead."
+    )
+
+
+def _last_error(log: Path) -> str:
+    """The most telling line of the browser's own log, for an early-exit message."""
+    if not log.exists():
+        return ""
+    lines = [l for l in log.read_text(errors="replace").splitlines() if "ERROR" in l or "error" in l.lower()]
+    noise = ("PHONE_REGISTRATION", "registration_request", "gcm/")
+    useful = [l for l in lines if not any(n in l for n in noise)]
+    return (useful or lines or [""])[-1].split("] ", 1)[-1].strip()
+
+
 def find_browser() -> str | None:
     for name in get_config("login")["browsers"]:
         path = shutil.which(name)
@@ -66,7 +105,7 @@ class DevTools:
             pass
 
 
-def _wait_for_port(profile: Path, proc: subprocess.Popen, timeout: float) -> str:
+def _wait_for_port(profile: Path, proc: subprocess.Popen, timeout: float, log: Path) -> str:
     marker = profile / "DevToolsActivePort"
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -75,8 +114,12 @@ def _wait_for_port(profile: Path, proc: subprocess.Popen, timeout: float) -> str
             if len(lines) >= 2:
                 return f"ws://127.0.0.1:{lines[0]}{lines[1]}"
         if proc.poll() is not None:
+            reason = _last_error(log)
             raise AuthError(
-                "The browser closed right away. If a login window from an earlier run is still open, close it and retry."
+                "The browser closed right away"
+                + (f" ({reason})" if reason else "")
+                + ". If a login window from an earlier run is still open, close it and retry; "
+                "otherwise run ./entry.sh login --paste."
             )
         time.sleep(0.2)
     raise AuthError("The browser did not start its DevTools endpoint in time.")
@@ -117,13 +160,18 @@ def capture_session(
         "--no-default-browser-check",
     ]
     if headless:
-        args.append("--headless=new")
+        env, extra = dict(os.environ), ["--headless=new"]
+    else:
+        env, extra = display_env()
+    args += extra
     args.append(start_url or f"{web_url.rstrip('/')}/login")
-    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    log = data_dir() / "browser-login.log"
+    with open(log, "w") as log_fh:
+        proc = subprocess.Popen(args, stdout=log_fh, stderr=log_fh, env=env, start_new_session=True)
 
     devtools = None
     try:
-        devtools = DevTools(_wait_for_port(profile, proc, 30), timeout=30)
+        devtools = DevTools(_wait_for_port(profile, proc, 30, log), timeout=30)
         if on_ready:
             on_ready(devtools)
         last_checked = ""
