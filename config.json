@@ -1,0 +1,52 @@
+{
+  "overleaf": {
+    "git_host": "https://git.overleaf.com",
+    "project_url": "https://www.overleaf.com/project/",
+    "web_url": "https://www.overleaf.com"
+  },
+  "git": {
+    "timeout_seconds": 120,
+    "commit_name": "overleaf-mcp",
+    "commit_email": "overleaf-mcp@localhost"
+  },
+  "compile": {
+    "timeout_seconds": 180,
+    "default_engine": "pdflatex",
+    "max_errors": 30,
+    "remote_timeout_seconds": 240
+  },
+  "files": {
+    "max_read_bytes": 400000,
+    "text_suffixes": [
+      ".tex",
+      ".bib",
+      ".cls",
+      ".sty",
+      ".bst",
+      ".txt",
+      ".md",
+      ".cfg",
+      ".def",
+      ".latexmkrc",
+      ".json",
+      ".yaml",
+      ".yml"
+    ]
+  },
+  "search": {
+    "max_hits": 200
+  },
+  "latex": {
+    "section_commands": [
+      "part",
+      "chapter",
+      "section",
+      "subsection",
+      "subsubsection",
+      "paragraph"
+    ]
+  },
+  "web": {
+    "timeout_seconds": 60
+  }
+}

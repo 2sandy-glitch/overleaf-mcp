@@ -1,0 +1,35 @@
+{
+  "default": "resume",
+  "overleaf_cookie": "PASTE_overleaf_session2_VALUE (./entry.sh login fills this in)",
+  "projects": {
+    "resume": {
+      "name": "My Resume",
+      "backend": "overleaf-web",
+      "project_id": "PASTE_PROJECT_ID_FROM_OVERLEAF_URL",
+      "main_file": "main.tex"
+    },
+    "resume-git": {
+      "name": "Same, via the Git bridge (paid plans)",
+      "backend": "overleaf-git",
+      "project_id": "PASTE_PROJECT_ID",
+      "token": "olp_PASTE_GIT_TOKEN",
+      "main_file": "main.tex"
+    },
+    "thesis-local": {
+      "name": "Local LaTeX folder",
+      "backend": "local",
+      "path": "~/latex/thesis",
+      "main_file": "thesis.tex"
+    },
+    "paper-selfhosted": {
+      "name": "Paper on another git host",
+      "backend": "git",
+      "remote_url": "https://git.example.org/me/paper.git",
+      "token": "OPTIONAL_HTTP_TOKEN",
+      "section_commands": [
+        "section",
+        "subsection"
+      ]
+    }
+  }
+}
