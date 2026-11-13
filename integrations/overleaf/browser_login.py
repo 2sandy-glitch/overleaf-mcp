@@ -163,6 +163,10 @@ def capture_session(
         env, extra = dict(os.environ), ["--headless=new"]
     else:
         env, extra = display_env()
+        # On newer GNOME, Chrome's desktop integration reads GSettings keys that no longer
+        # exist (xsettings "antialiasing") and aborts at startup. A generic desktop name
+        # makes Chrome skip that integration; only this login window's look is affected.
+        env["XDG_CURRENT_DESKTOP"] = "X-Generic"
     args += extra
     args.append(start_url or f"{web_url.rstrip('/')}/login")
     log = data_dir() / "browser-login.log"
